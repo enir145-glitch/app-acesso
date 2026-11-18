@@ -8,47 +8,45 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// =========================================================================
-// CONFIGURAÇÃO DO BANCO DE DADOS MONGODB
-// =========================================================================
-// Opção 1: Se for usar variável de ambiente no Render (Recomendado) -> process.env.DATABASE_URL
-// Opção 2: Cole sua string de conexão diretamente aqui entre aspas caso queira testar localmente.
-// Exemplo de link: "mongodb+srv://seu_usuario:sua_senha@cluster.mongodb.net/contador?retryWrites=true&w=majority"
+// 1. Sua string de conexão (via Render ou colada aqui para testes)
 const MONGO_URI = process.env.DATABASE_URL || "mongodb+srv://contador:contador123@cluster0.m7g5y19.mongodb.net/?compressors=zlib";
 
-// Conectando ao MongoDB
-mongoose.connect(MONGO_URI)
+// 2. Conectando ao MongoDB com bufferCommands desativado para falhar rápido se houver erro
+mongoose.connect(MONGO_URI, {
+  serverSelectionTimeoutMS: 10000,
+  bufferCommands: false // Impede que o Mongoose fique guardando comandos se o banco estiver desconectado
+})
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
-  .catch((erro) => console.error('Erro ao conectar no MongoDB:', erro));
+  .catch((erro) => console.error('Erro fatal ao conectar no MongoDB:', erro));
 
-// Definindo o modelo de dados para os acessos diários
+// Definindo o modelo
 const visitaSchema = new mongoose.Schema({
-  data: { type: String, required: true, unique: true }, // Ex: "2026-11-18"
-  dispositivos: { type: [String], default: [] }         // Lista de IDs únicos que acessaram no dia
+  data: { type: String, required: true, unique: true },
+  dispositivos: { type: [String], default: [] }
 });
 
 const Visita = mongoose.model('Visita', visitaSchema);
 
-// Obtém a data atual no formato YYYY-MM-DD (Fuso horário de Brasília)
 function getDataAtual() {
   return new Date().toLocaleDateString('en-CA', {
     timeZone: 'America/Sao_Paulo'
   });
 }
 
-// Função auxiliar para buscar ou criar o documento do dia atual no banco
 async function obterOuCriarRegistroHoje() {
   const hoje = getDataAtual();
   
+  // Garante que o banco está conectado antes de buscar
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('O banco de dados ainda não está conectado.');
+  }
+
   let registro = await Visita.findOne({ data: hoje });
   
-  // Se o documento de hoje ainda não existe no banco, ele cria um novo zerado
   if (!registro) {
-    registro = new Date(); // apenas para garantir criação limpa se necessário
     try {
       registro = await Visita.create({ data: hoje, dispositivos: [] });
     } catch (e) {
-      // Caso haja concorrência de requisições no exato momento da virada, busca novamente
       registro = await Visita.findOne({ data: hoje });
     }
   }
@@ -56,20 +54,15 @@ async function obterOuCriarRegistroHoje() {
   return registro;
 }
 
-// =========================================================================
-// ROTAS DA API
-// =========================================================================
-
-// Rota para registrar acesso do dispositivo
+// Rotas da API continuam iguais...
 app.post('/api/acesso', async (req, res) => {
   try {
     const { deviceId } = req.body;
     const registroHoje = await obterOuCriarRegistroHoje();
 
-    // Se o dispositivo foi informado e ainda não está registrado hoje
     if (deviceId && !registroHoje.dispositivos.includes(deviceId)) {
       registroHoje.dispositivos.push(deviceId);
-      await registroHoje.save(); // Salva a atualização no MongoDB
+      await registroHoje.save();
     }
 
     res.json({
@@ -82,7 +75,6 @@ app.post('/api/acesso', async (req, res) => {
   }
 });
 
-// Rota para apenas consultar o status atual
 app.get('/api/status', async (req, res) => {
   try {
     const registroHoje = await obterOuCriarRegistroHoje();
