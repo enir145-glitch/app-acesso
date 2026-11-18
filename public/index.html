@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor de Acessos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #0d1326 0%, #05070f 100%);
+    }
+
+    canvas#neural-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Banner em formato de botão no canto inferior direito */
+    .access-banner-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 50px;
+      color: #f8fafc;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+      transition: all 0.25s ease;
+      user-select: none;
+    }
+
+    .access-banner-btn:hover {
+      transform: translateY(-2px);
+      border-color: #38bdf8;
+      box-shadow: 0 0 28px rgba(56, 189, 248, 0.5);
+    }
+
+    .access-banner-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Indicador pulsante verde/ciano */
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      background-color: #22d3ee;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #22d3ee;
+      animation: pulse 1.8s infinite;
+    }
+
+    .counter-badge {
+      background: linear-gradient(135deg, #0284c7, #22d3ee);
+      color: #020617;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 211, 238, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    }
+
+    @media (max-width: 480px) {
+      .access-banner-btn {
+        bottom: 16px;
+        right: 16px;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="neural-canvas"></canvas>
+
+  <button class="access-banner-btn" id="btn-contador" title="Clique para atualizar">
+    <span class="pulse-dot"></span>
+    <span>Acessos hoje:</span>
+    <span class="counter-badge" id="contador-valor">...</span>
+  </button>
+
+  <script>
+    // ==========================================
+    // 1. LÓGICA DO CONTADOR ÚNICO POR DISPOSITIVO
+    // ==========================================
+    function obterDeviceId() {
+      let id = localStorage.getItem('meu_app_device_id');
+      if (!id) {
+        // Gera um ID único persistente para este navegador/dispositivo
+        id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('meu_app_device_id', id);
+      }
+      return id;
+    }
+
+    async function registrarEAtualizarAcesso() {
+      const badge = document.getElementById('contador-valor');
+      try {
+        const deviceId = obterDeviceId();
+        const resposta = await fetch('/api/acesso', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId })
+        });
+        const dados = await resposta.json();
+        badge.textContent = dados.totalHoje;
+      } catch (erro) {
+        console.error('Erro ao registrar acesso:', erro);
+        badge.textContent = '1';
+      }
+    }
+
+    // Atualiza ao clicar no botão também
+    document.getElementById('btn-contador').addEventListener('click', registrarEAtualizarAcesso);
+    registrarEAtualizarAcesso();
+
+    // ==========================================
+    // 2. ANIMAÇÃO DE NEURÔNIOS SE CONECTANDO
+    // ==========================================
+    const canvas = document.getElementById('neural-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height, particles;
+    const mouse = { x: null, y: null, radius: 150 };
+
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.x;
+      mouse.y = e.y;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        mouse.x = e.touches[0].clientX;
+        mouse.y = e.touches[0].clientY;
+      }
+    });
+
+    window.addEventListener('mouseout', () => {
+      mouse.x = null;
+      mouse.y = null;
+    });
+
+    function initCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+
+      // Ajusta quantidade de neurônios conforme o tamanho da tela
+      const numParticles = Math.min(Math.floor((width * height) / 9000), 130);
+      particles = [];
+
+      for (let i = 0; i < numParticles; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 1.1,
+          vy: (Math.random() - 0.5) * 1.1,
+          radius: Math.random() * 2.2 + 1.2,
+          color: Math.random() > 0.3 ? '#38bdf8' : '#a855f7' // Azul ciano e roxo neon
+        });
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Rebater nas bordas
+        if (p.x < 0 || p.x > width) p.vx *= -1;
+        if (p.y < 0 || p.y > height) p.vy *= -1;
+
+        // Desenha o núcleo do neurônio
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = p.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Conexões entre neurônios próximos (sinapses)
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const maxDist = 130;
+
+          if (dist < maxDist) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(56, 189, 248, ${(1 - dist / maxDist) * 0.55})`;
+            ctx.lineWidth = 1;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+
+        // Conexão interativa com o dedo/mouse do usuário
+        if (mouse.x !== null && mouse.y !== null) {
+          const dxMouse = p.x - mouse.x;
+          const dyMouse = p.y - mouse.y;
+          const distMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse);
+
+          if (distMouse < mouse.radius) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(168, 85, 247, ${(1 - distMouse / mouse.radius) * 0.85})`;
+            ctx.lineWidth = 1.4;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', initCanvas);
+    initCanvas();
+    animate();
+  </script>
+</body>
+</html>
