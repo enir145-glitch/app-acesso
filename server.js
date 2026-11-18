@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Opção 1: Se for usar variável de ambiente no Render (Recomendado) -> process.env.DATABASE_URL
 // Opção 2: Cole sua string de conexão diretamente aqui entre aspas caso queira testar localmente.
 // Exemplo de link: "mongodb+srv://seu_usuario:sua_senha@cluster.mongodb.net/contador?retryWrites=true&w=majority"
-const MONGO_URI = process.env.DATABASE_URL || "mongodb+srv://admin:<admin123>@cluster0.m7g5y19.mongodb.net/";
+const MONGO_URI = process.env.DATABASE_URL || "mongodb+srv://admin:<xexnxixrxmxoxnxgxox>@cluster0.m7g5y19.mongodb.net/";
 
 // Conectando ao MongoDB
 mongoose.connect(MONGO_URI)
