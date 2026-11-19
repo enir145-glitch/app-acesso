@@ -9,7 +9,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 1. Sua string de conexão (via Render ou colada aqui para testes)
-const MONGO_URI = process.env.DATABASE_URL || "     mongodb+srv://contador:contador123@cluster0.m7g5y19.mongodb.net/";
+const MONGO_URI = process.env.DATABASE_URL || "mongodb+srv://contador:contador123@cluster0.m7g5y19.mongodb.net/";
 
 // 2. Conectando ao MongoDB com bufferCommands desativado para falhar rápido se houver erro
 mongoose.connect(MONGO_URI, {
